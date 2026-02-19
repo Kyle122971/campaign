@@ -1,15 +1,22 @@
 FROM golang:1.24-alpine AS builder
-RUN apk add --no-cache gcc musl-dev linux-headers git
+# 1. Install git (needed to pull the Ethereum source code)
+RUN apk add --no-cache git gcc musl-dev linux-headers
+
 WORKDIR /app
 
-# Change this line to only copy go.mod first, 
-# then let 'go mod download' generate the requirements
+# 2. Copy ONLY the go.mod file
 COPY go.mod ./
-RUN go mod download
 
+# 3. CRITICAL: Generate the missing go.sum entries inside the container
+RUN go mod tidy
+
+# 4. Copy the rest of your code (main.go, etc.)
 COPY . .
+
+# 5. Build the binary as a static, pure-Go executable
 RUN CGO_ENABLED=0 GOOS=linux go build -o engine main.go
 
+# 6. Final lightweight production image
 FROM alpine:latest
 RUN apk add --no-cache ca-certificates
 WORKDIR /root/
